@@ -1,6 +1,8 @@
 # Production compose override for CAF
-# Drop this next to your compose.yaml on the production server
+# Place this next to compose.yaml on the production server
+# It overrides x-customizable-image to use the custom CAF image
 
 x-customizable-image: &customizable_image
   image: hisham733/caf-hisham:latest
   pull_policy: always
+  restart: unless-stopped
