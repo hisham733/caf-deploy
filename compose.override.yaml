@@ -1,0 +1,6 @@
+# Production compose override for CAF
+# Drop this next to your compose.yaml on the production server
+
+x-customizable-image: &customizable_image
+  image: hisham733/caf-hisham:latest
+  pull_policy: always

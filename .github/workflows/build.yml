@@ -1,0 +1,40 @@
+name: Build and Push Custom Frappe Image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Checkout frappe_docker
+        uses: actions/checkout@v4
+        with:
+          repository: frappe/frappe_docker
+          path: frappe_docker
+
+      - name: Copy apps.json into frappe_docker context
+        run: cp apps.json frappe_docker/apps.json
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: hisham733
+          password: ${{ secrets.DOCKER_PAT }}
+
+      - name: Build and push image
+        working-directory: frappe_docker
+        run: |
+          docker build \
+            --build-arg=FRAPPE_BRANCH=version-15 \
+            --build-arg=CACHE_BUST="${{ github.sha }}" \
+            --secret=id=apps_json,src=apps.json \
+            --tag=hisham733/caf-hisham:latest \
+            --tag=hisham733/caf-hisham:${{ github.sha }} \
+            --file=images/layered/Containerfile .
+          docker push --all-tags hisham733/caf-hisham
