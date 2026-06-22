@@ -140,7 +140,8 @@ Or check [github.com/hisham733/caf-deploy/actions](https://github.com/hisham733/
 ```bash
 # On production server, inside frappe_docker/
 
-# Pull new image and restart all containers
+# --pull always pulls the latest image before recreating containers
+# (no need to run 'docker compose pull' separately)
 docker compose -f compose.yaml \
   -f overrides/compose.mariadb.yaml \
   -f overrides/compose.redis.yaml \
@@ -180,7 +181,7 @@ Also check `http://localhost:8080` that HRMS modules appear in the Frappe desk.
          ↓
 4. On production server:
    
-   # Pull new image and restart
+   # --pull always pulls latest image before recreating (no separate pull needed)
    docker compose -f compose.yaml \
      -f overrides/compose.mariadb.yaml \
      -f overrides/compose.redis.yaml \
