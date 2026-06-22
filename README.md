@@ -98,6 +98,76 @@ x-customizable-image: &customizable_image
 
 ---
 
+## Adding a New App to the Pipeline
+
+This workflow applies to any Frappe app (e.g., HRMS, LMS, a custom app).
+
+### Step 1 — Add the app to `apps.json`
+
+```json
+[
+  { "url": "https://github.com/frappe/erpnext", "branch": "version-15" },
+  { "url": "https://github.com/frappe/hrms",     "branch": "version-15" },   // new
+  { "url": "https://github.com/hisham733/caf_hisham.git", "branch": "develop" }
+]
+```
+
+Rules:
+- **Public repos:** use `https://` URL
+- **Branch:** must be compatible with the Frappe version (version-15)
+- **Order matters:** Frappe core apps first, then custom apps
+
+### Step 2 — Commit & push to `caf-deploy`
+
+```bash
+git add apps.json && git commit -m "feat: add hrms app"
+git push
+```
+
+Push to `main` triggers the `build.yml` GitHub Action automatically. Image builds with all three apps baked in.
+
+### Step 3 — Wait for build to complete
+
+```bash
+# Check status via CLI (optional)
+gh run list --repo hisham733/caf-deploy --limit 3
+```
+
+Or check [github.com/hisham733/caf-deploy/actions](https://github.com/hisham733/caf-deploy/actions).
+
+### Step 4 — Deploy new image to production
+
+```bash
+# On production server, inside frappe_docker/
+
+# Pull new image and restart all containers
+docker compose -f compose.yaml \
+  -f overrides/compose.mariadb.yaml \
+  -f overrides/compose.redis.yaml \
+  -f overrides/compose.migrator.yaml \
+  -f overrides/compose.noproxy.yaml \
+  up -d --pull always
+```
+
+### Step 5 — Install the new app on the existing site
+
+The app is now in the Docker image but not yet installed on your site.
+
+```bash
+docker compose exec backend bench --site site1.local install-app hrms
+```
+
+### Step 6 — Verify
+
+```bash
+docker compose exec backend bench --site site1.local list-apps
+# Expected output includes: erpnext, hrms, caf
+```
+
+Also check `http://localhost:8080` that HRMS modules appear in the Frappe desk.
+
+---
+
 ## Full Update Cycle (app code changed)
 
 ```
@@ -130,27 +200,26 @@ x-customizable-image: &customizable_image
 
 ### DB User IP Locking
 
-**Problem:** When `bench new-site` creates a MariaDB user, it locks it to the backend container's Docker IP (e.g., `192.168.48.9`). On container restart, the backend gets a new IP, causing `Access denied` errors.
+**Problem:** When `bench new-site` creates a MariaDB user without specifying a host scope, it locks it to the backend container's Docker IP (e.g., `192.168.48.9`). On container restart, the backend gets a new IP, causing `Access denied` errors.
 
 **Error seen:**
 ```
 pymysql.err.OperationalError: (1045, "Access denied for user '_b533f5fdd65aaf8c'@'192.168.48.6'")
 ```
 
-**Diagnosis:**
-```sql
-SELECT User, Host FROM mysql.user WHERE User LIKE '_b533%';
--- Returns: _b533f5fdd65aaf8c | 192.168.48.9  (old IP, not current)
-```
+**Fix (applied in `deploy.sh`):**
+The `--mariadb-user-host-login-scope '%'` flag is passed to `bench new-site`, which creates the DB user with `Host='%'` from the start — accepting connections from any IP.
 
-**Fix (one-time after site creation):**
 ```bash
-docker compose exec db mariadb -u root -p"$DB_ROOT_PASSWORD" -NBe \
-  "SELECT CONCAT('RENAME USER ''',User,'''@''',Host,''' TO ''',User,'''@''%%'';') FROM mysql.user WHERE User LIKE '\_%' AND Host != '%'" \
-  | docker compose exec -T db mariadb -u root -p"$DB_ROOT_PASSWORD"
+bench new-site site1.local \
+  --mariadb-root-password admin \
+  --admin-password admin \
+  --mariadb-user-host-login-scope '%' \
+  --install-app erpnext \
+  --install-app caf
 ```
 
-**Prevention:** The above command is permanently added to `deploy.sh` right after `bench new-site`, so it runs automatically on the first deployment.
+**Result:** DB user always has `%` host. Restarts, IP changes, or container re-creation will never break database authentication.
 
 ### Configurator Errors
 
@@ -168,7 +237,19 @@ This is a known Frappe Docker issue when restarting an existing site. The config
 ## Troubleshooting
 
 ### "Access denied for user" on restart
-Re-run the DB user fix command above.
+This should not happen if `--mariadb-user-host-login-scope '%'` was used when creating the site. If it still occurs, check and fix the user host manually:
+
+```bash
+docker compose exec db mariadb -u root -p"$DB_PASSWORD" -e \
+  "SELECT User, Host FROM mysql.user WHERE User LIKE '\_%' AND Host != '%';"
+```
+
+If any user has a specific IP instead of `%`:
+```bash
+docker compose exec db mariadb -u root -p"$DB_PASSWORD" -NBe \
+  "SELECT CONCAT('RENAME USER ''',User,'''@''',Host,''' TO ''',User,'''@''%%'';') FROM mysql.user WHERE User LIKE '\_%' AND Host != '%'" \
+  | docker compose exec -T db mariadb -u root -p"$DB_PASSWORD"
+```
 
 ### Site broken after restart
 ```bash
