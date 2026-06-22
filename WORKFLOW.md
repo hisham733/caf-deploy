@@ -1,0 +1,164 @@
+# CAF Deployment Workflows
+
+Three common scenarios for managing your Frappe production server.
+
+---
+
+## 1. Fresh Install (from zero)
+
+Use this when setting up a brand new server or after wiping everything with `down -v`.
+
+### Prerequisites
+
+- Docker + Docker Compose installed
+- `frappe_docker` repo cloned on the server
+- `.env` configured (copy from `caf-deploy/.env.example`)
+- `compose.override.yaml` copied next to `compose.yaml`
+
+### Commands
+
+```bash
+# 1. Start the stack (MariaDB, Redis, backend, frontend, migrator)
+docker compose -f compose.yaml \
+  -f overrides/compose.mariadb.yaml \
+  -f overrides/compose.redis.yaml \
+  -f overrides/compose.migrator.yaml \
+  -f overrides/compose.noproxy.yaml \
+  up -d
+
+# 2. Create site with all apps
+docker compose exec backend bench new-site site1.local \
+  --mariadb-root-password admin \
+  --admin-password admin \
+  --mariadb-user-host-login-scope '%' \
+  --install-app erpnext \
+  --install-app caf
+
+# 3. Access at http://localhost:8080
+#    Login: Administrator / admin
+```
+
+Or use the deploy script (does steps 1 and 2 in one shot):
+
+```bash
+./deploy.sh
+```
+
+---
+
+## 2. Update CAF App (after code changes)
+
+Use this when you push changes to `hisham733/caf_hisham` and want the production server to run the updated code.
+
+### Step 1 — Trigger image build
+
+```bash
+# From any machine with gh CLI
+gh workflow run build.yml --repo hisham733/caf-deploy --ref main
+```
+
+Wait ~5-10 minutes for the build to finish. Check status:
+
+```bash
+gh run list --repo hisham733/caf-deploy --limit 3
+```
+
+### Step 2 — Deploy to production
+
+```bash
+# On production server, inside frappe_docker/
+docker compose -f compose.yaml \
+  -f overrides/compose.mariadb.yaml \
+  -f overrides/compose.redis.yaml \
+  -f overrides/compose.migrator.yaml \
+  -f overrides/compose.noproxy.yaml \
+  up -d --pull always
+```
+
+`--pull always` pulls the new `hisham733/caf-hisham:latest` image before recreating containers. No separate `docker compose pull` needed.
+
+### Step 3 — Apply DB migrations (if any)
+
+```bash
+docker compose exec backend bench --site site1.local migrate
+```
+
+### Step 4 — Verify
+
+```bash
+docker compose exec backend bench --site site1.local migrate
+```
+
+Open `http://localhost:8080` and confirm the changes are live.
+
+---
+
+## 3. Install a New App (e.g., HRMS)
+
+Use this when you want to add a new Frappe app to the stack.
+
+### Step 1 — Add the app to `apps.json`
+
+Edit `apps.json` in the `caf-deploy` repo:
+
+```json
+[
+  { "url": "https://github.com/frappe/erpnext", "branch": "version-15" },
+  { "url": "https://github.com/frappe/hrms",     "branch": "version-15" },
+  { "url": "https://github.com/hisham733/caf_hisham.git", "branch": "develop" }
+]
+```
+
+Rules:
+- **Public repos** use `https://` URL
+- **Branch** must match the Frappe version (version-15)
+- **Order:** core apps first, then custom apps
+
+### Step 2 — Commit and push
+
+```bash
+git add apps.json
+git commit -m "feat: add hrms app"
+git push
+```
+
+Pushing to `main` triggers the GitHub Action build automatically.
+
+### Step 3 — Wait for the build to complete
+
+```bash
+# Optional: check build status
+gh run list --repo hisham733/caf-deploy --limit 3
+```
+
+Or check [github.com/hisham733/caf-deploy/actions](https://github.com/hisham733/caf-deploy/actions).
+
+### Step 4 — Deploy the new image
+
+```bash
+# On production server, inside frappe_docker/
+docker compose -f compose.yaml \
+  -f overrides/compose.mariadb.yaml \
+  -f overrides/compose.redis.yaml \
+  -f overrides/compose.migrator.yaml \
+  -f overrides/compose.noproxy.yaml \
+  up -d --pull always
+```
+
+### Step 5 — Install the app on the site
+
+The app is now in the Docker image but not yet registered on your site:
+
+```bash
+docker compose exec backend bench --site site1.local install-app hrms
+```
+
+### Step 6 — Verify
+
+```bash
+docker compose exec backend bench --site site1.local list-apps
+```
+
+Expected output includes: `erpnext`, `hrms`, `caf`.
+
+Open `http://localhost:8080` and check that HRMS modules appear in the desk.
