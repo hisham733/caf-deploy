@@ -16,3 +16,9 @@ docker compose exec -T backend bash -c "ls sites/site1.local/site_config.json 2>
     --admin-password admin \
     --install-app erpnext \
     --install-app caf
+
+# Fix DB user host to '%' so restarts don't break DB auth
+echo "Setting DB user host to '%' for Docker IP stability..."
+docker compose exec db mariadb -u root -p"$DB_PASSWORD" -NBe \
+  "SELECT CONCAT('RENAME USER ''',User,'''@''',Host,''' TO ''',User,'''@''%%'';') FROM mysql.user WHERE User LIKE '\_%' AND Host != '%'" \
+  | docker compose exec -T db mariadb -u root -p"$DB_PASSWORD"
