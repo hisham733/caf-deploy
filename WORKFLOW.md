@@ -1,6 +1,26 @@
 # CAF Deployment Workflows
 
-Three common scenarios for managing your Frappe production server.
+Four common scenarios for managing your Frappe production server.
+
+---
+
+## 0. Develop and Push App Changes
+
+Use this before scenarios 2 and 3 below. App source code lives in the dev environment at `/workspace/development/frappe-bench/apps/caf/` (the `caf_hisham` repo, `develop` branch).
+
+### Step 1 — Make changes
+Edit files in `apps/caf/` as needed.
+
+### Step 2 — Stage, commit, push
+```bash
+# In /workspace/development/frappe-bench/apps/caf/
+git add .
+git commit -m "description of changes"
+git push
+```
+
+### Step 3 — Proceed to pipeline
+After push succeeds, follow **Scenario 2** below to trigger the image build and deploy to production.
 
 ---
 
@@ -48,7 +68,7 @@ Or use the deploy script (does steps 1 and 2 in one shot):
 
 ## 2. Update CAF App (after code changes)
 
-Use this when you push changes to `hisham733/caf_hisham` and want the production server to run the updated code.
+Use this after completing **Scenario 0** (push changes to `caf_hisham`). Triggers a new Docker image build and deploys it to production.
 
 ### Step 1 — Trigger image build
 
@@ -86,7 +106,8 @@ docker compose exec backend bench --site site1.local migrate
 ### Step 4 — Verify
 
 ```bash
-docker compose exec backend bench --site site1.local migrate
+docker compose exec backend bench --site site1.local list-apps
+# Confirm caf app is listed
 ```
 
 Open `http://localhost:8080` and confirm the changes are live.
