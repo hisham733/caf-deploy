@@ -1,5 +1,33 @@
 # CAF Frappe Deployment Pipeline
 
+## Quick Start (new PC)
+
+```bash
+# 1. Install Docker + Docker Compose
+#    (https://docs.docker.com/engine/install/)
+
+# 2. Clone the base Frappe Docker setup
+git clone https://github.com/frappe/frappe_docker.git
+cd frappe_docker
+
+# 3. Clone this repo and copy config files
+git clone https://github.com/hisham733/caf-deploy.git ~/caf-deploy
+cp ~/caf-deploy/compose.override.yaml .
+cp ~/caf-deploy/.env.example .env
+
+# 4. Edit .env (at least set a secure DB_PASSWORD)
+#    nano .env
+
+# 5. Deploy (starts containers + creates the site on first run)
+cp ~/caf-deploy/deploy.sh .
+./deploy.sh
+
+# 6. Access at http://localhost:8080
+#    Login: Administrator / admin
+```
+
+---
+
 ## Architecture Overview
 
 ```
