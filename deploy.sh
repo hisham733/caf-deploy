@@ -17,7 +17,7 @@ docker compose -f compose.yaml \
   -f overrides/compose.redis.yaml \
   -f overrides/compose.migrator.yaml \
   -f overrides/compose.noproxy.yaml \
-  up -d
+  up -d --pull always
 
 # Create site only if it doesn't already exist
 if ! docker compose exec -T backend test -f "sites/$SITE_NAME/site_config.json"; then

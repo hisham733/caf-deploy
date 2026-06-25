@@ -113,6 +113,7 @@ CUSTOM_TAG=latest
 PULL_POLICY=always
 DB_PASSWORD=your_db_password_here
 SITE_NAME=site1.local
+FRAPPE_SITE_NAME_HEADER=site1.local
 ```
 
 ### `compose.override.yaml`
@@ -304,7 +305,7 @@ docker compose -f compose.yaml \
 ### Access site
 
 -   URL: `http://localhost:8080`
--   Site: configurable via `SITE_NAME` in `.env` (default: `site1.local`)
+-   Site: configurable via `SITE_NAME` + `FRAPPE_SITE_NAME_HEADER` in `.env` (default: `site1.local`)
 -   Login: `Administrator` / `admin`
 
 ---
