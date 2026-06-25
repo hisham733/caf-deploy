@@ -3,6 +3,9 @@ name: Build and Push Custom Frappe Image
 on:
   push:
     branches: [main]
+    paths:
+      - apps.json
+      - .github/workflows/build.yml
   workflow_dispatch:
 
 jobs:
