@@ -1,11 +1,13 @@
 [
   {
     "url": "https://github.com/frappe/erpnext",
-    "branch": "version-15"
+    "branch": "v15.87.0",
+    "commit": "ad4fe2db9eea85fbcd66f23197b3424e29db2629"
   },
   {
     "url": "https://github.com/frappe/hrms",
-    "branch": "version-15"
+    "branch": "develop",
+    "commit": "79e078bb1c85920f8d91f9d51e48e22209b4b497"
   },
   {
     "url": "https://github.com/hisham733/caf_hisham.git",
