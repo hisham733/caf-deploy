@@ -31,7 +31,7 @@ jobs:
         working-directory: frappe_docker
         run: |
           docker build \
-            --build-arg=FRAPPE_BRANCH=version-15 \
+            --build-arg=FRAPPE_BRANCH=v15.88.0 \
             --build-arg=CACHE_BUST="${{ github.sha }}" \
             --secret=id=apps_json,src=apps.json \
             --tag=hisham733/caf-hisham:latest \
