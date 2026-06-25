@@ -79,6 +79,8 @@ gh workflow run build.yml --repo hisham733/caf-deploy --ref main
 
 ## Deployment Process (`deploy.sh`)
 
+> **Updating an existing site?** See [UPDATE.md](./UPDATE.md) for pulling new images, running migrations, and rollback.
+
 ### Flow
 
 ```bash
@@ -318,3 +320,4 @@ docker compose -f compose.yaml \
 | `deploy.sh` | One-shot deployment script for production server |
 | `.env.example` | Template for production `.env` file |
 | `compose.override.yaml` | Overrides base image to use custom CAF image |
+| `UPDATE.md` | Guide for pulling new images and production updates |
