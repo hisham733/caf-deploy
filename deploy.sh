@@ -11,6 +11,9 @@ fi
 SITE_NAME="${SITE_NAME:-site1.local}"
 DB_PASSWORD="${DB_PASSWORD:-admin}"
 
+# Pass site name to compose so Nginx routes correctly
+export FRAPPE_SITE_NAME_HEADER="$SITE_NAME"
+
 # Start the stack
 docker compose -f compose.yaml \
   -f overrides/compose.mariadb.yaml \
