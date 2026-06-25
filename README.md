@@ -12,7 +12,7 @@ Two repos:
 - **`hisham733/caf_hisham`** — CAF Frappe app source code (develop branch)
 - **`hisham733/caf-deploy`** — Deployment config (this repo): `apps.json`, `build.yml`, `deploy.sh`, `.env`
 
-The app and Frappe/ERPNext are **not installed directly on the server**. A pre-built Docker image (`hisham733/caf-hisham:latest`) contains everything: Frappe v15, ERPNext v15, and the CAF app. The production server only pulls this image.
+The app and Frappe/ERPNext are **not installed directly on the server**. A pre-built Docker image (`hisham733/caf-hisham:latest`) contains everything: Frappe v15, ERPNext v15, and the CAF app. The production server only pulls this image. The site name is configurable via `SITE_NAME` in `.env` (default: `site1.local`).
 
 ---
 
@@ -68,7 +68,7 @@ gh workflow run build.yml --repo hisham733/caf-deploy --ref main
    - `compose.migrator.yaml` (auto-migration)
    - `compose.noproxy.yaml` (port 8080)
 
-2. **Create site** (first run only) — Checks if `site1.local/site_config.json` exists. If not, creates `site1.local` with ERPNext + CAF installed.
+2. **Create site** (first run only) — Checks if `$SITE_NAME/site_config.json` exists. If not, creates the site with ERPNext + CAF installed.
 
 ### Prerequisites
 
@@ -84,6 +84,7 @@ CUSTOM_IMAGE=hisham733/caf-hisham
 CUSTOM_TAG=latest
 PULL_POLICY=always
 DB_PASSWORD=your_db_password_here
+SITE_NAME=site1.local
 ```
 
 ### `compose.override.yaml`
@@ -155,13 +156,13 @@ docker compose -f compose.yaml \
 The app is now in the Docker image but not yet installed on your site.
 
 ```bash
-docker compose exec backend bench --site site1.local install-app hrms
+docker compose exec backend bench --site "$SITE_NAME" install-app hrms
 ```
 
 ### Step 6 — Verify
 
 ```bash
-docker compose exec backend bench --site site1.local list-apps
+docker compose exec backend bench --site "$SITE_NAME" list-apps
 # Expected output includes: erpnext, hrms, caf
 ```
 
@@ -190,7 +191,7 @@ Also check `http://localhost:8080` that HRMS modules appear in the Frappe desk.
      up -d --pull always
    
    # Apply any DB schema changes
-   docker compose exec backend bench --site site1.local migrate
+   docker compose exec backend bench --site "$SITE_NAME" migrate
    
    # Verify at http://localhost:8080
 ```
@@ -212,8 +213,8 @@ pymysql.err.OperationalError: (1045, "Access denied for user '_b533f5fdd65aaf8c'
 The `--mariadb-user-host-login-scope '%'` flag is passed to `bench new-site`, which creates the DB user with `Host='%'` from the start — accepting connections from any IP.
 
 ```bash
-bench new-site site1.local \
-  --mariadb-root-password admin \
+bench new-site "$SITE_NAME" \
+  --mariadb-root-password "$DB_PASSWORD" \
   --admin-password admin \
   --mariadb-user-host-login-scope '%' \
   --install-app erpnext \
@@ -260,7 +261,7 @@ docker compose logs configurator --tail 20
 docker compose logs migrator --tail 20
 
 # Check current config
-docker compose exec backend cat sites/site1.local/site_config.json
+docker compose exec backend cat "sites/$SITE_NAME/site_config.json"
 docker compose exec backend cat sites/common_site_config.json
 
 # Reset completely (WIPES ALL DATA)
@@ -272,10 +273,11 @@ docker compose -f compose.yaml \
   down -v
 # Then re-run deploy.sh
 ```
-
 ### Access site
-- URL: `http://localhost:8080`
-- Login: `Administrator` / `admin`
+
+-   URL: `http://localhost:8080`
+-   Site: configurable via `SITE_NAME` in `.env` (default: `site1.local`)
+-   Login: `Administrator` / `admin`
 
 ---
 
