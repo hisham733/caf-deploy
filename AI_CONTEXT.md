@@ -22,9 +22,11 @@ The Docker image (`hisham733/caf-hisham:latest`) bundles Frappe v15 + ERPNext v1
 | `.github/workflows/build.yml` | GitHub Actions workflow: builds layered Containerfile, pushes to Docker Hub |
 | `deploy.sh` | One-shot script: starts compose stack + creates site (first run only) |
 | `compose.override.yaml` | Overrides base Frappe image ref to use custom image |
-| `.env.example` | Template for production `.env` (image ref, DB password, gunicorn settings) |
-| `README.md` | Full reference documentation |
+| `.env.example` | Template for production `.env` (image ref, DB password, site name, gunicorn) |
+| `README.md` | Full reference documentation with Quick Start |
+| `UPDATE.md` | Pulling new images, running migrations, rollback guide |
 | `WORKFLOW.md` | Step-by-step workflows for 4 scenarios |
+| `WINDOWS.md` | Windows setup guide |
 | `AI_CONTEXT.md` | This file — for AI context restoration |
 
 ## Docker Compose Stack
@@ -34,59 +36,80 @@ Base compose file is from `frappe/frappe_docker` (`compose.yaml`). Overrides use
 - `compose.migrator.yaml` — Auto-migration on startup
 - `compose.noproxy.yaml` — Exposes port 8080
 
+Custom image pulled via `compose.override.yaml`.
+
 ## Build Pipeline (build.yml)
+- Triggered only when `apps.json` or `.github/workflows/build.yml` changes (not on doc/config pushes)
 - Uses `images/layered/Containerfile` from `frappe/frappe_docker`
 - Apps injected via `apps.json` using BuildKit `--secret` (not ARG)
 - Build args: `FRAPPE_BRANCH=version-15`, `CACHE_BUST=${{ github.sha }}`
 - Tags pushed: `latest` + commit SHA
 
+## Environment Variables (.env)
+
+| Variable | Default | Used By |
+|---|---|---|
+| `CUSTOM_IMAGE` | `hisham733/caf-hisham` | Docker Compose |
+| `CUSTOM_TAG` | `latest` | Docker Compose |
+| `PULL_POLICY` | `always` | Docker Compose |
+| `DB_PASSWORD` | `admin` | deploy.sh + Compose |
+| `SITE_NAME` | `site1.local` | deploy.sh (bench new-site) |
+| `FRAPPE_SITE_NAME_HEADER` | derived from `SITE_NAME` by deploy.sh | Nginx (routes requests) |
+| `GUNICORN_THREADS` | `4` | Gunicorn |
+| `GUNICORN_WORKERS` | `2` | Gunicorn |
+| `GUNICORN_TIMEOUT` | `120` | Gunicorn |
+
+`FRAPPE_SITE_NAME_HEADER` is automatically exported by `deploy.sh` from `SITE_NAME`, so you only need to set one place.
+
 ## Deployment Commands
 
-### Fresh install
+### Fresh install (README Quick Start)
 ```bash
-docker compose -f compose.yaml \
-  -f overrides/compose.mariadb.yaml \
-  -f overrides/compose.redis.yaml \
-  -f overrides/compose.migrator.yaml \
-  -f overrides/compose.noproxy.yaml \
-  up -d
-
-docker compose exec backend bench new-site site1.local \
-  --mariadb-root-password admin \
-  --admin-password admin \
-  --mariadb-user-host-login-scope '%' \
-  --install-app erpnext \
-  --install-app caf
+git clone https://github.com/frappe/frappe_docker.git
+cd frappe_docker
+git clone https://github.com/hisham733/caf-deploy.git ~/caf-deploy
+cp ~/caf-deploy/compose.override.yaml .
+cp ~/caf-deploy/.env.example .env
+# edit .env (at least DB_PASSWORD)
+cp ~/caf-deploy/deploy.sh .
+./deploy.sh
 ```
 
+### deploy.sh does
+1. Sources `.env`
+2. Exports `FRAPPE_SITE_NAME_HEADER=$SITE_NAME`
+3. `docker compose up -d --pull always` (with all overrides)
+4. Creates site `$SITE_NAME` with erpnext + hrms + caf if not exists
+
 ### Update (after code change + build)
+See `UPDATE.md` for full details, backup, rollback.
+
 ```bash
-gh workflow run build.yml --repo hisham733/caf-deploy --ref main
-# wait for build
 docker compose -f compose.yaml \
   -f overrides/compose.mariadb.yaml \
   -f overrides/compose.redis.yaml \
   -f overrides/compose.migrator.yaml \
   -f overrides/compose.noproxy.yaml \
   up -d --pull always
-docker compose exec backend bench --site site1.local migrate
+
+docker compose exec backend bench --site "$SITE_NAME" migrate
 ```
 
 ### Add new app (e.g., HRMS)
 1. Add to `apps.json`
-2. Push → triggers build
+2. Push → triggers build (`apps.json` path filter)
 3. `up -d --pull always`
-4. `docker compose exec backend bench --site site1.local install-app hrms`
+4. `docker compose exec backend bench --site "$SITE_NAME" install-app hrms`
 
 ### Useful commands
 ```bash
-docker compose exec backend bench --site site1.local list-apps
-docker compose exec backend bench --site site1.local migrate
-docker compose exec backend cat sites/site1.local/site_config.json
+docker compose exec backend bench --site "$SITE_NAME" list-apps
+docker compose exec backend bench --site "$SITE_NAME" migrate
+docker compose exec backend cat "sites/$SITE_NAME/site_config.json"
 docker compose exec backend cat sites/common_site_config.json
 docker compose logs backend --tail 50
 docker compose logs configurator --tail 20
-docker compose exec db mariadb -u root -padmin -e "SHOW DATABASES;"
+docker compose exec db mariadb -u root -p"$DB_PASSWORD" -e "SHOW DATABASES;"
 ```
 
 ## Issues & Fixes
@@ -101,10 +124,10 @@ docker compose exec db mariadb -u root -padmin -e "SHOW DATABASES;"
 ### Stale migrate lock
 `bench_migrate.lock` stuck from migrator container. Fix:
 ```bash
-docker compose exec backend rm /home/frappe/frappe-bench/sites/site1.local/locks/bench_migrate.lock
+docker compose exec backend rm "/home/frappe/frappe-bench/sites/$SITE_NAME/locks/bench_migrate.lock"
 ```
 
 ## Site Access
 - URL: `http://localhost:8080`
+- Site: `$SITE_NAME` (default `site1.local`)
 - Login: `Administrator` / `admin`
-- Site name: `site1.local`

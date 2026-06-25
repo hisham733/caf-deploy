@@ -2,6 +2,8 @@
 
 Four common scenarios for managing your Frappe production server.
 
+All commands assume you are inside `frappe_docker/` with `.env`, `compose.override.yaml`, and `deploy.sh` in place.
+
 ---
 
 ## 0. Develop and Push App Changes
@@ -32,36 +34,41 @@ Use this when setting up a brand new server or after wiping everything with `dow
 
 - Docker + Docker Compose installed
 - `frappe_docker` repo cloned on the server
-- `.env` configured (copy from `caf-deploy/.env.example`)
 - `compose.override.yaml` copied next to `compose.yaml`
+- `.env` configured (copy from `caf-deploy/.env.example`)
 
-### Commands
+### Option A — Use deploy.sh (recommended)
 
 ```bash
-# 1. Start the stack (MariaDB, Redis, backend, frontend, migrator)
+cp ~/caf-deploy/deploy.sh .
+./deploy.sh
+```
+
+### Option B — Manual steps
+
+```bash
+# 1. Ensure FRAPPE_SITE_NAME_HEADER matches SITE_NAME (deploy.sh does this automatically)
+export FRAPPE_SITE_NAME_HEADER="${SITE_NAME:-site1.local}"
+
+# 2. Start the stack (MariaDB, Redis, backend, frontend, migrator)
 docker compose -f compose.yaml \
   -f overrides/compose.mariadb.yaml \
   -f overrides/compose.redis.yaml \
   -f overrides/compose.migrator.yaml \
   -f overrides/compose.noproxy.yaml \
-  up -d
+  up -d --pull always
 
-# 2. Create site with all apps
-docker compose exec backend bench new-site site1.local \
-  --mariadb-root-password admin \
+# 3. Create site with all apps
+docker compose exec backend bench new-site "$SITE_NAME" \
+  --mariadb-root-password "$DB_PASSWORD" \
   --admin-password admin \
   --mariadb-user-host-login-scope '%' \
   --install-app erpnext \
+  --install-app hrms \
   --install-app caf
 
-# 3. Access at http://localhost:8080
+# 4. Access at http://localhost:8080
 #    Login: Administrator / admin
-```
-
-Or use the deploy script (does steps 1 and 2 in one shot):
-
-```bash
-./deploy.sh
 ```
 
 ---
@@ -100,13 +107,13 @@ docker compose -f compose.yaml \
 ### Step 3 — Apply DB migrations (if any)
 
 ```bash
-docker compose exec backend bench --site site1.local migrate
+docker compose exec backend bench --site "$SITE_NAME" migrate
 ```
 
 ### Step 4 — Verify
 
 ```bash
-docker compose exec backend bench --site site1.local list-apps
+docker compose exec backend bench --site "$SITE_NAME" list-apps
 # Confirm caf app is listed
 ```
 
@@ -143,7 +150,7 @@ git commit -m "feat: add hrms app"
 git push
 ```
 
-Pushing to `main` triggers the GitHub Action build automatically.
+Pushing to `main` triggers the GitHub Action build automatically (only `apps.json` or workflow changes trigger it).
 
 ### Step 3 — Wait for the build to complete
 
@@ -171,15 +178,19 @@ docker compose -f compose.yaml \
 The app is now in the Docker image but not yet registered on your site:
 
 ```bash
-docker compose exec backend bench --site site1.local install-app hrms
+docker compose exec backend bench --site "$SITE_NAME" install-app hrms
 ```
 
 ### Step 6 — Verify
 
 ```bash
-docker compose exec backend bench --site site1.local list-apps
+docker compose exec backend bench --site "$SITE_NAME" list-apps
 ```
 
 Expected output includes: `erpnext`, `hrms`, `caf`.
 
 Open `http://localhost:8080` and check that HRMS modules appear in the desk.
+
+---
+
+> **For production updates** (backup, migrations, rollback), see [UPDATE.md](./UPDATE.md).

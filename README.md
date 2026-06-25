@@ -2,6 +2,8 @@
 
 ## Quick Start (new PC)
 
+> **Windows user?** See [WINDOWS.md](./WINDOWS.md) for WSL 2 or Git Bash setup.
+
 ```bash
 # 1. Install Docker + Docker Compose
 #    (https://docs.docker.com/engine/install/)
@@ -47,7 +49,7 @@ The app and Frappe/ERPNext are **not installed directly on the server**. A pre-b
 ## CI/CD Pipeline (GitHub Actions)
 
 Triggered by:
-- Push to `main` branch
+- Push to `main` branch (only when `apps.json` or `build.yml` changes)
 - Manual trigger (`workflow_dispatch`)
 
 ### Steps
@@ -321,3 +323,6 @@ docker compose -f compose.yaml \
 | `.env.example` | Template for production `.env` file |
 | `compose.override.yaml` | Overrides base image to use custom CAF image |
 | `UPDATE.md` | Guide for pulling new images and production updates |
+| `WINDOWS.md` | Windows setup guide (WSL 2 / Git Bash) |
+| `WORKFLOW.md` | Step-by-step workflows for common scenarios |
+| `AI_CONTEXT.md` | AI agent context file |
