@@ -27,6 +27,7 @@ if ! docker compose exec -T backend test -f "sites/$SITE_NAME/site_config.json";
       --admin-password admin \
       --mariadb-user-host-login-scope '%' \
       --install-app erpnext \
+      --install-app hrms \
       --install-app caf
 else
   echo "Site $SITE_NAME already exists, skipping creation."
